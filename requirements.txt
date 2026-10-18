@@ -1,0 +1,24 @@
+# Cascade-XID runtime dependencies — Python 3.11
+# Pinned for reproducibility. `torch` resolves to the PyPI build for this platform;
+# install a CUDA build explicitly if GPU acceleration is required.
+numpy==1.26.4
+pandas==2.2.3
+pyarrow==17.0.0
+scikit-learn==1.5.2
+xgboost==2.1.1
+shap==0.46.0
+torch==2.4.1
+optuna==4.0.0
+sentence-transformers==3.1.1
+transformers==4.44.2
+tokenizers==0.19.1
+huggingface-hub==0.25.2
+faiss-cpu==1.8.0.post1
+pydantic==2.9.2
+PyYAML==6.0.2
+matplotlib==3.9.2
+pytest==8.3.3
+typer==0.12.5
+tqdm==4.66.5
+requests==2.32.3
+streamlit==1.38.0

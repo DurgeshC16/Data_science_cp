@@ -1,0 +1,81 @@
+# Cascade-XID — single source of truth for every script and Makefile target.
+# Paths are relative to the project root (the parent of this file's directory).
+# Values marked PLACEHOLDER are intentionally unfitted: they must be calibrated on
+# data before any result is reported.
+
+project_name: cascade-xid
+seed: 42
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  kb: data/kb
+  models: models
+  reports: reports
+  figures: reports/figures
+
+data:
+  # PLACEHOLDER: set to the dataset actually downloaded into data/raw.
+  # Nothing is inferred or invented when this is null.
+  dataset: null
+  raw_glob: "*.csv"
+  label_column: label
+  flow_id_column: null
+  drop_columns: []
+
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  stratify: true
+
+tier1:
+  model: random_forest        # random_forest | xgboost
+  calibration: isotonic       # none | isotonic | sigmoid
+  n_estimators: 300           # PLACEHOLDER, tuned in Phase 2
+  max_depth: null
+  n_trials: 25                # Optuna trials on the training split only
+
+gate:
+  # PLACEHOLDER thresholds; fitted on the validation split in Phase 3.
+  # A flow is escalated when max predicted probability is below
+  # `max_prob_threshold` OR predictive entropy exceeds `entropy_threshold`.
+  max_prob_threshold: 0.75
+  entropy_threshold: 1.0
+  target_escalation_rate_min: 0.05
+  target_escalation_rate_max: 0.15
+
+shap:
+  background_samples: 200
+  max_display_features: 10
+
+rag:
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  index_path: data/kb/faiss.index
+  passages_path: data/kb/passages.jsonl
+  top_k: 5
+  min_score: 0.0
+
+llm:
+  backend: ollama             # ollama | llamacpp
+  base_url: http://localhost:11434
+  model: llama3.1:8b          # any local open-weight model served by the backend
+  temperature: 0.0
+  max_tokens: 512
+  timeout_seconds: 120
+  # Guardrail: reject answers whose ATT&CK/CVE identifiers are not present in the
+  # retrieved evidence (see docs/PROGRESS.md, Phase 0 decisions).
+  require_grounded_ids: true
+  max_retries: 1
+
+eval:
+  sample_cap: 2000            # cap on flows scored during evaluation
+  bootstrap_resamples: 1000
+  confidence_level: 0.95
+  metrics:
+    - accuracy
+    - macro_f1
+    - per_class_recall
+    - escalation_rate
+    - tier2_latency_ms

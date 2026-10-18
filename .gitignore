@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Data and generated artifacts (directories are tracked via .gitkeep)
+data/raw/*
+!data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/kb/*
+!data/kb/.gitkeep
+models/*
+!models/.gitkeep
+reports/figures/*
+!reports/figures/.gitkeep
+reports/*.log
+
+# Local env
+.env
