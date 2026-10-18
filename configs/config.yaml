@@ -79,12 +79,60 @@ preprocess:
   zeroday_classes: []
   zeroday_max_classes: 2
 
+# Phase 3: Tier-1 candidates and benchmark.
+# Hyper-parameters are tuned with Optuna on TRAIN (fit) + VALIDATION (objective)
+# only. The test split is evaluated once, after every family and task has been
+# tuned, and is never fed back into model selection.
 tier1:
-  model: random_forest        # random_forest | xgboost
+  # Default family consumed by later phases. The benchmark's selection rule
+  # below names the champion in reports/tier1_benchmark.json; update this value
+  # if the reported choice differs.
+  model: random_forest        # random_forest | xgboost | mlp
   calibration: isotonic       # none | isotonic | sigmoid
-  n_estimators: 300           # PLACEHOLDER, tuned in Phase 2
-  max_depth: null
-  n_trials: 25                # Optuna trials on the training split only
+  families: [random_forest, xgboost, mlp]
+  tasks: [binary, multiclass]
+  # Three seeds, per the benchmark protocol. Every fit uses one of these, and
+  # results are reported as mean +/- std across them.
+  seeds: [42, 43, 44]
+  n_jobs: -1                    # threads for training only
+  # Threads used when scoring. RF/XGBoost parallelise every predict call, so a
+  # single-flow latency measured with n_jobs=-1 is all worker start-up.
+  inference_n_jobs: 1
+  optuna:
+    n_trials: 20              # per (task, family), on validation macro-F1
+    time_budget_seconds: 600  # hard wall-clock bound per (task, family)
+  selection:
+    # Highest mean macro-F1 subject to mean p95 single-flow latency <= 25 ms.
+    metric: macro_f1          # macro_f1 | accuracy | weighted_f1
+    max_p95_latency_ms: 25.0
+    tie_breaker: accuracy     # accuracy | macro_f1 | weighted_f1 | p95_latency_ms
+  benchmark:
+    latency_calls: 1000       # single-flow calls for the latency distribution
+    warmup_calls: 50
+    batch_size: 1024          # batch-throughput chunk size
+    throughput_max_rows: 50000
+    torch_threads: 1          # fixed thread count so latency is comparable
+  random_forest:
+    n_estimators_max: 500
+    max_depth_max: 40
+    min_samples_leaf_max: 20
+  xgboost:
+    n_estimators_max: 500
+    max_depth_max: 10
+    learning_rate_min: 0.01
+    learning_rate_max: 0.3
+  mlp:
+    # Small feed-forward networks: 2-3 ReLU hidden layers.
+    hidden_layer_options:
+      - [64, 32]
+      - [128, 64]
+      - [128, 64, 32]
+    epochs: 60
+    batch_size: 256
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    dropout: 0.1
+    patience: 8
 
 gate:
   # PLACEHOLDER thresholds; fitted on the validation split in Phase 3.

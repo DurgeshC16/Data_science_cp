@@ -254,3 +254,149 @@ actually exists; no metric below is invented._
 - `python -m ruff check src tests` -> PASS.
 - `python -m src.data.preprocess --dataset cicids2017` against the empty raw
   directory -> download instructions printed, exit code 1 (no fabricated split).
+---
+
+## Phase 3 — Tier-1 training and benchmark (2026-10-19)
+
+### Done
+
+- `src/tier1/train.py` (new):
+  - loads the Phase-2 parquet splits plus `models/<dataset>_features.json`,
+    verifies every feature is present and that no `flow_id` appears in two
+    splits (`load_processed_splits`);
+  - three model families: `RandomForestClassifier`, `XGBClassifier`
+    (`tree_method=hist`) and `TorchMLP`, a feed-forward network with 2-3 ReLU
+    hidden layers and dropout;
+  - both tasks: `binary` (Normal/Attack) and `multiclass` (10-class unified
+    taxonomy), taken from the Phase-2 label columns;
+  - a bounded Optuna search (`tier1.optuna.n_trials` + `time_budget_seconds`,
+    TPE sampler seeded from `seed`) that fits on **train** and maximises
+    **validation** macro-F1; the test split is not a parameter of
+    `tune_hyperparameters`;
+  - final fits for every configured seed, then one test evaluation per seed
+    (`compute_metrics`: accuracy, macro/weighted precision, recall and F1,
+    per-class precision/recall/F1/support, confusion matrix);
+  - `measure_latency` (single-flow `predict_proba`, median/p95/mean over
+    `benchmark.latency_calls` calls after `warmup_calls`), and
+    `measure_batch_throughput` (flows/sec on up to
+    `benchmark.throughput_max_rows` test rows);
+  - `save_model` / `load_tier1_model` for `.joblib` (sklearn) and `.pt`
+    (state dict + architecture) artifacts, returning the on-disk size;
+  - `aggregate_runs` (mean +/- sample std across seeds) and
+    `select_default_model` (configurable latency-constrained rule);
+  - report writers: `reports/tier1_benchmark.json`,
+    `reports/tier1_benchmark.md` (comparison table) and
+    `reports/figures/tier1_confusion_<task>_<family>.png`;
+  - CLI (`python -m src.tier1.train --dataset ...`) with overrides for tasks,
+    families, seeds, trial count, time budget and directories.
+- `src/config.py` + `configs/config.yaml`: `tier1` reworked into `families`,
+  `tasks`, `seeds` (3 seeds), `n_jobs`, `inference_n_jobs`,
+  `optuna{n_trials,time_budget_seconds}`, `selection{metric,max_p95_latency_ms,
+  tie_breaker}`, `benchmark{latency_calls,warmup_calls,batch_size,
+  throughput_max_rows,torch_threads}`, `random_forest`, `xgboost` and `mlp`
+  search bounds, with validators (2-3 MLP layers, unique seeds, non-empty
+  lists, ordered XGBoost learning-rate bounds).
+- `Makefile`: `tier1-benchmark` target (`DATASET ?= cicids2017`).
+- `src/tier1/__init__.py`: lazy exports via a module-level `__getattr__` so that
+  `python -m src.tier1.train` does not import the module twice (eager imports
+  triggered a runpy warning on the `make tier1-benchmark` path).
+- `tests/test_tier1.py`: 22 tests on a synthetic fixture in the real on-disk
+  format - disjoint splits and duplicate-`flow_id` rejection, hand-computed
+  metric values, per-family fit/predict/save/load round trips (RF, XGBoost,
+  MLP), latency/throughput measurement, validation-only tuning objective
+  (test labels are corrupted so a test-peeking tuner would score differently),
+  trial/budget bounds, mean +/- std aggregation, both selection-rule branches,
+  inference-thread pinning, full benchmark artifacts, empty-data CLI exit code,
+  and config/Makefile contracts.
+- Installed the already-pinned `xgboost==2.1.1`, `optuna==4.0.0` and
+  `torch==2.4.1` (CPU) into `.venv`; they were declared in `requirements.txt`
+  but absent.
+
+### Decisions
+
+- **Model selection uses the validation split, never the test split.** Choosing
+  the champion by test macro-F1 would turn the test split into a selection
+  signal, which the phase constraints forbid. Latency is a hardware property
+  measured on test rows and carries no label information. Rule:
+  `highest mean val.macro_f1 subject to mean p95 latency <= 25 ms`, with
+  `accuracy` as tie-breaker; when nothing meets the budget the report records
+  the lowest-p95 model and sets `selection.fallback_used = true`.
+- **Inference runs with a fixed thread count (`tier1.inference_n_jobs = 1`);
+  training keeps `n_jobs = -1`.** `RandomForestClassifier.predict_proba`
+  parallelises *every* call, so a single-flow measurement with `n_jobs=-1`
+  mostly measures worker start-up. On the synthetic smoke fixture, pinning
+  moved RF median single-flow latency from 28.9 ms to 3.8 ms (p95 40.3 -> 10.4
+  ms) with identical predictions. The setting is recorded in the report and
+  stored in the saved estimator.
+- **Hyper-parameters are tuned once per (task, family) with `config.seed`, then
+  refit per seed.** Running the full search per seed would triple the budget;
+  refitting the winning configuration for each of the three seeds still yields
+  the required seed spread. Refits use the **train** split only (not
+  train+val), because the validation split has already been used for selection.
+- **Test is touched only after every task/family finished tuning.**
+  `run_benchmark` runs Phase A (all studies, train/val only) then Phase B
+  (final fits, metrics, timing, artifacts), so test metrics exist once per seed
+  and are labelled "reported, not used for selection".
+- **`accuracy_per_ms` is defined as test accuracy divided by median single-flow
+  latency (ms)** and written into the JSON `definitions` block so the ratio is
+  unambiguous.
+- **Class weights, not resampling.** Each family uses balanced class weights
+  computed from the training split (`class_weight` dict for RF, `sample_weight`
+  for XGBoost, weighted cross-entropy for the MLP). No row is duplicated.
+- **MLP early stopping uses the validation split** (the designated tuning
+  split); the test split is never used for stopping.
+- **Saved artifacts carry the served configuration**: the `.joblib` payload
+  holds the estimator with `n_jobs` pinned to the inference value plus labels,
+  feature names, seed and hyper-parameters; the `.pt` payload holds the state
+  dict plus architecture, so later phases reload without guessing.
+
+### Metrics
+
+- **Not measured on real data.** `data/raw/` is still empty (only `.gitkeep`),
+  so no parquet split exists and `reports/tier1_benchmark.json`,
+  `reports/tier1_benchmark.md` and the confusion-matrix figures are **not**
+  present for CICIDS2017 or CICIoT2023. Training cannot start without data, and
+  per AGENTS.md rule 7 nothing was synthesised in its place.
+- The only numbers this phase produced come from a **throw-away synthetic
+  fixture** (600 rows, 6 features, 3 classes, 3 trials, 3 seeds) used to prove
+  the code paths run. They are **not** dataset results and were deliberately
+  written outside `reports/`. Observed there: all six task/family combinations
+  completed, 18 runs -> 6 aggregates, 6 confusion-matrix PNGs, a markdown table
+  with mean +/- std, and the rule selected the MLP for `binary`.
+- Latency, throughput, model size, training time and macro-F1 for
+  CICIDS2017/CICIoT2023: **not measured**.
+
+### Open issues
+
+- Datasets still absent: every dataset-dependent acceptance item (benchmark
+  JSON, comparison table, confusion-matrix figures, recorded default model) is
+  blocked until CSVs land in `data/raw/<dataset>/` and
+  `make preprocess-<dataset>` runs.
+- `tier1.model` in `configs/config.yaml` is still the Phase-0 placeholder
+  (`random_forest`); once a real run exists it must be set to whatever
+  `reports/tier1_benchmark.json` records as `chosen_default`. Nothing overrides
+  it silently at runtime.
+- The default search budget (20 trials / 600 s per task+family, 6 combinations)
+  has never run against real data; wall-clock on CICIDS2017 (~2.8M flows, 78
+  features) is **unknown**. If RF trials exhaust RAM, lower
+  `tier1.random_forest.n_estimators_max` or run with `DEV_SAMPLE`.
+- MLP throughput depends on `tier1.benchmark.torch_threads` (default 1); other
+  values are not comparable across runs.
+- The `destination_port` shortcut risk from Phase 2 is still not ablated, so
+  benchmark scores must not be read as generalisation claims.
+
+### Verification
+
+- `python -m pytest -q` -> 110 passed (22 new in `tests/test_tier1.py`).
+- `python -m ruff check src tests` -> All checks passed.
+- `make test` and `make lint` -> exit 0 (2026-10-19).
+- Synthetic fixture end to end through the CLI (`--tasks binary,multiclass
+  --families random_forest,xgboost,mlp --seeds 42,43,44 --n-trials 3`) -> exit 0;
+  wrote `tier1_benchmark.json` (tuning entries, 18 runs, 6 aggregates with
+  mean/std, selection block, environment versions, git commit),
+  `tier1_benchmark.md` and 6 confusion-matrix PNGs; all 18 saved models reload
+  through `load_tier1_model`.
+- Real-data path in this environment: `make tier1-benchmark` -> prints
+  "feature list not found ... Run `make preprocess-cicids2017` first." and exits
+  non-zero, leaving `reports/` without a benchmark artifact
+  (stop-instead-of-fake behaviour holds).

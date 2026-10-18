@@ -15,7 +15,7 @@ endif
 
 CONFIG ?= configs/config.yaml
 
-.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023
+.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023 tier1-benchmark
 
 setup: venv install dirs
 	@$(VENV_PY) -c "from src.config import load_config; c = load_config('$(CONFIG)'); print('config OK:', c.project_name, '| seed', c.seed, '| splits', c.split.train, c.split.val, c.split.test)"
@@ -64,6 +64,13 @@ preprocess-cicids2017:
 preprocess-ciciot2023:
 	@$(VENV_PY) -m src.data.preprocess --dataset ciciot2023 --config $(CONFIG) \
 		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
+
+# Phase 3: train and benchmark Tier-1 candidates on the processed splits.
+# DATASET ?= cicids2017; override with `make tier1-benchmark DATASET=ciciot2023`.
+DATASET ?= cicids2017
+
+tier1-benchmark:
+	@$(VENV_PY) -m src.tier1.train --dataset $(DATASET) --config $(CONFIG)
 
 clean:
 	@rm -rf $(VENV) .pytest_cache .ruff_cache

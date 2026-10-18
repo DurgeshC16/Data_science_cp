@@ -98,16 +98,145 @@ class PreprocessConfig(BaseModel):
         return self
 
 
-class Tier1Config(BaseModel):
-    """Fast classical model settings (PLACEHOLDER values until Phase 2)."""
+class OptunaConfig(BaseModel):
+    """Bounded hyper-parameter search on the validation split only."""
 
     model_config = ConfigDict(extra="forbid")
 
-    model: Literal["random_forest", "xgboost"] = "random_forest"
+    n_trials: int = Field(default=20, ge=1)
+    time_budget_seconds: float = Field(default=600.0, gt=0.0)
+
+
+class SelectionConfig(BaseModel):
+    """Rule that picks the default Tier-1 model from the benchmark table.
+
+    A candidate is eligible when its mean p95 single-flow latency is at most
+    ``max_p95_latency_ms``; the winner maximises ``metric``, with ``tie_breaker``
+    used when the metric values are equal.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    metric: Literal["macro_f1", "accuracy", "weighted_f1"] = "macro_f1"
+    max_p95_latency_ms: float = Field(default=25.0, gt=0.0)
+    tie_breaker: Literal["accuracy", "macro_f1", "weighted_f1", "p95_latency_ms"] = (
+        "accuracy"
+    )
+
+
+class BenchmarkConfig(BaseModel):
+    """Timing protocol for the Tier-1 benchmark."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    latency_calls: int = Field(default=1000, ge=1)
+    warmup_calls: int = Field(default=50, ge=0)
+    batch_size: int = Field(default=1024, ge=1)
+    throughput_max_rows: int = Field(default=50000, ge=1)
+    torch_threads: int = Field(default=1, ge=1)
+
+
+class RandomForestConfig(BaseModel):
+    """Search bounds for the Random Forest family."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    n_estimators_max: int = Field(default=500, gt=0)
+    max_depth_max: int = Field(default=40, gt=0)
+    min_samples_leaf_max: int = Field(default=20, gt=0)
+
+
+class XGBoostConfig(BaseModel):
+    """Search bounds for the XGBoost family."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    n_estimators_max: int = Field(default=500, gt=0)
+    max_depth_max: int = Field(default=10, gt=0)
+    learning_rate_min: float = Field(default=0.01, gt=0.0)
+    learning_rate_max: float = Field(default=0.3, gt=0.0)
+
+    @model_validator(mode="after")
+    def _check_ranges(self) -> "XGBoostConfig":
+        if self.learning_rate_min >= self.learning_rate_max:
+            raise ValueError("learning_rate_min must be below learning_rate_max")
+        return self
+
+
+class MlpConfig(BaseModel):
+    """Small feed-forward network settings (2-3 hidden layers).
+
+    ``hidden_layer_options`` is the categorical search space; every option must
+    contain 2 or 3 positive layer widths.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    hidden_layer_options: list[list[int]] = Field(
+        default_factory=lambda: [[64, 32], [128, 64], [128, 64, 32]]
+    )
+    epochs: int = Field(default=60, ge=1)
+    batch_size: int = Field(default=256, gt=0)
+    learning_rate: float = Field(default=1e-3, gt=0.0)
+    weight_decay: float = Field(default=1e-4, ge=0.0)
+    dropout: float = Field(default=0.1, ge=0.0, lt=1.0)
+    patience: int = Field(default=8, ge=1)
+
+    @model_validator(mode="after")
+    def _check_layers(self) -> "MlpConfig":
+        if not self.hidden_layer_options:
+            raise ValueError("hidden_layer_options must not be empty")
+        for option in self.hidden_layer_options:
+            if len(option) not in (2, 3):
+                raise ValueError(
+                    f"each MLP option needs 2 or 3 hidden layers, got {option}"
+                )
+            if any(width <= 0 for width in option):
+                raise ValueError(f"MLP widths must be positive, got {option}")
+        return self
+
+
+class Tier1Config(BaseModel):
+    """Tier-1 benchmark settings: families, tasks, seeds, tuning and timing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Default family used by downstream phases. The benchmark writes the family
+    #: chosen by ``selection`` into reports/tier1_benchmark.json; keep this value
+    #: in sync with that choice (nothing silently overrides it at runtime).
+    model: Literal["random_forest", "xgboost", "mlp"] = "random_forest"
     calibration: Literal["none", "isotonic", "sigmoid"] = "isotonic"
-    n_estimators: int = Field(default=300, gt=0)
-    max_depth: int | None = Field(default=None, gt=0)
-    n_trials: int = Field(default=25, ge=0)
+    families: list[Literal["random_forest", "xgboost", "mlp"]] = Field(
+        default_factory=lambda: ["random_forest", "xgboost", "mlp"]
+    )
+    tasks: list[Literal["binary", "multiclass"]] = Field(
+        default_factory=lambda: ["binary", "multiclass"]
+    )
+    seeds: list[int] = Field(default_factory=lambda: [42, 43, 44])
+    n_jobs: int = -1
+    #: Threads used when scoring. RandomForest/XGBoost parallelise *every*
+    #: predict call, so serving one flow with ``n_jobs=-1`` is dominated by
+    #: worker start-up; a fixed count keeps the reported latency meaningful and
+    #: comparable across families. Training still uses ``n_jobs``.
+    inference_n_jobs: int = Field(default=1, ge=1)
+    optuna: OptunaConfig = Field(default_factory=OptunaConfig)
+    selection: SelectionConfig = Field(default_factory=SelectionConfig)
+    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
+    random_forest: RandomForestConfig = Field(default_factory=RandomForestConfig)
+    xgboost: XGBoostConfig = Field(default_factory=XGBoostConfig)
+    mlp: MlpConfig = Field(default_factory=MlpConfig)
+
+    @model_validator(mode="after")
+    def _check_lists(self) -> "Tier1Config":
+        if not self.families:
+            raise ValueError("tier1.families must not be empty")
+        if not self.tasks:
+            raise ValueError("tier1.tasks must not be empty")
+        if not self.seeds:
+            raise ValueError("tier1.seeds must not be empty")
+        if len(set(self.seeds)) != len(self.seeds):
+            raise ValueError("tier1.seeds must be unique")
+        return self
 
 
 class GateConfig(BaseModel):
