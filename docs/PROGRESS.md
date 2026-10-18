@@ -400,3 +400,155 @@ actually exists; no metric below is invented._
   "feature list not found ... Run `make preprocess-cicids2017` first." and exits
   non-zero, leaving `reports/` without a benchmark artifact
   (stop-instead-of-fake behaviour holds).
+---
+
+## Phase 4 — Probability calibration and the confidence gate (2026-10-19)
+
+### Done
+
+- `src/tier1/calibrate.py` (new): fits a probability calibrator per benchmarked
+  Tier-1 run on `gate.calibrator_fit_split` and evaluates it before/after with
+  expected calibration error (ECE), the multiclass Brier score, log loss and a
+  reliability diagram.
+  - methods: `none` (identity), `isotonic` (monotone piecewise-constant per
+    class), `sigmoid` (Platt scaling on the class score);
+  - multiclass = one-vs-rest per class followed by row renormalisation (an
+    approximation, stated in the report);
+  - a class with a single label value in the fit split is left uncalibrated and
+    recorded under `identity_classes` instead of fitting an arbitrary map;
+  - artifacts `models/tier1/<dataset>_<task>_<family>_seed<seed>_calibrator.joblib`,
+    `reports/calibration_report.json`, `reports/calibration_report.md` and
+    `reports/figures/tier1_reliability_<task>_<family>.png`;
+  - CLI `python -m src.tier1.calibrate --dataset ...` with task/family/seed and
+    directory overrides.
+- `src/gate/gate.py` (new): turns probabilities into the two gate scores
+  (`max_probability`, predictive `entropy` in nats or bits) and applies the OR
+  policy `escalate if max_prob < max_prob_threshold OR entropy >
+  entropy_threshold`.
+  - thresholds are **fitted** on `gate.threshold_fit_split` (`val`) by sweeping
+    quantile levels: `max_prob_threshold = Q_t(max_prob)` and
+    `entropy_threshold = Q_{1-t}(entropy)`, selecting the pair whose escalation
+    rate lies in `[target_escalation_rate_min, target_escalation_rate_max]` and
+    is closest to the band midpoint;
+  - if no candidate reaches the band the run raises with the closest achievable
+    rate in the message (no threshold is reported as if it had hit the target);
+  - reports escalation rate, Tier-1-only accuracy, escalated accuracy, error
+    capture rate, per-class escalation rates and the config placeholders side by
+    side with the fitted values;
+  - scores the zero-day holdout when present, which measures whether the gate
+    escalates classes the Tier-1 model never saw;
+  - artifacts `reports/gate_report.json`, `reports/gate_report.md`,
+    `reports/figures/gate_sweep_<task>_<family>.png` and
+    `reports/figures/gate_entropy_<task>_<family>.png`.
+- `src/tier1/train.py`: added `trained_model_from_artifact`, `read_benchmark_runs`
+  and `resolve_report_path`, so calibration and the gate reuse the benchmark's
+  model artifacts instead of re-training.
+- `src/config.py` + `configs/config.yaml`: `gate` gains
+  `use_calibrated_probabilities`, `calibrator_fit_split`, `threshold_fit_split`,
+  `grid_steps` and `entropy_base`; `eval` gains `calibration_bins`. The
+  `max_prob_threshold` / `entropy_threshold` values stay PLACEHOLDERS.
+- `Makefile`: `calibrate-cicids2017`, `calibrate-ciciot2023`, `gate-cicids2017`,
+  `gate-ciciot2023`.
+- `tests/conftest.py` (new): shared synthetic processed-split builder and a tiny
+  benchmark runner used by the new test modules.
+- `tests/test_calibrate.py` + `tests/test_gate.py`: 35 tests — hand-computed ECE,
+  Brier and log loss, isotonic improvement on overconfident scores, identity
+  handling for degenerate classes, artifact round-trip **and cross-process
+  load**, the calibrator being independent of the test split, threshold search
+  landing in band, the unreachable-band failure, deterministic thresholds,
+  escalation/OR semantics, error-capture accounting, zero-day scoring, raw vs
+  calibrated probability modes, missing-artifact exit codes and config
+  validators.
+
+### Decisions
+
+- **The calibrator is fitted on the dedicated `calibration` split by default,
+  not on validation.** Phase 2 created that split for exactly this purpose, but
+  the architecture diagram in AGENTS.md says "calibrator fitted on the
+  validation split only". Both readings are disjoint from train and test, so the
+  choice is one config line (`gate.calibrator_fit_split: calibration | val`);
+  the default follows the dedicated split, and the report records which split
+  was used. Gate thresholds are always fitted on `val`.
+- **The calibrator artifact is a plain dict, not the pickled dataclass.** The
+  first end-to-end smoke run failed with
+  `AttributeError: Can't get attribute 'ProbabilityCalibrator' on <module
+  'src.gate.gate'>`: a class defined in a module that a CLI executes as
+  `__main__` is pickled as `__main__.ProbabilityCalibrator`, so the artifact
+  written by `make calibrate-*` could not be loaded by `make gate-*`. Fixed by
+  storing `{"metadata": ..., "estimators": ...}` and rebuilding on load, plus a
+  regression test that loads the artifact from a separate interpreter.
+- **Model selection is not involved here: the gate is per run.** Every
+  benchmarked (task, family, seed) gets its own calibrator and its own
+  thresholds, so the report shows the spread instead of a single number. The
+  default Tier-1 family still comes from the Phase-3 selection rule.
+- **Test is scored, never fitted on.** Thresholds and calibrators are fitted on
+  `val` / `calibration`; the test split is only scored with the frozen
+  thresholds, and a test asserts that corrupting the test labels leaves both the
+  calibrators and the thresholds bit-identical.
+- **A threshold pair that misses the 5–15 % band is a failure, not a footnote.**
+  `fit_thresholds` raises with the closest achievable rate, and the CLI exits 1.
+- **The config placeholders are reported, not silently replaced.** Each gate
+  record keeps a `placeholder_thresholds` block labelled "config placeholders,
+  not FITTED thresholds", so the placeholder values can never be mistaken for
+  calibrated ones.
+- **Entropy unit is explicit** (`gate.entropy_base: natural | bits`); the
+  placeholder `entropy_threshold: 1.0` is only meaningful once the unit is known,
+  so the unit is recorded in every report.
+- **Zero-day scoring is defined on the multiclass taxonomy.** Phase 2 removes
+  whole multiclass classes; for the binary task those rows are ordinary
+  `Attack` flows, so only the multiclass record measures unseen-class behaviour.
+  This is stated in the gate report's `definitions`.
+- **Multiclass calibration is an approximation** (per-class one-vs-rest, then
+  renormalisation) and is labelled as such in the JSON `definitions`, so ECE
+  gains are not over-read.
+
+### Metrics
+
+- **Not measured on real data.** `data/raw/` is still empty, so
+  `reports/calibration_report.*`, `reports/gate_report.*` and the reliability /
+  gate figures do **not** exist for CICIDS2017 or CICIoT2023. No ECE, Brier,
+  log-loss, threshold or escalation rate for the real datasets has been
+  measured.
+- On the throw-away synthetic fixture (720 + 60 holdout rows, 4 features, 3
+  classes, 2 seeds, all three families) the pipeline ran end to end and
+  produced: calibration written for 12 runs, gate reports for 12 runs, and 12
+  gate figures plus 6 reliability figures. Observed there, **not dataset
+  results**: multiclass MLP seed 43 test ECE fell from 0.3980 to 0.1678, fit-split
+  escalation rates landed at 0.056–0.139 (inside the 0.05–0.15 band), and the
+  zero-day escalation rate ranged from 0.000 to 1.000 across runs depending on
+  how far the fixture's synthetic holdout rows sit from the training
+  distribution. Nothing from the fixture was copied into `reports/`.
+- Real-data escalation rate, error-capture rate and the size of the Tier-2 load
+  it implies: **not measured**.
+
+### Open issues
+
+- `reports/tier1_benchmark.json` does not exist yet, so `make calibrate-*` and
+  `make gate-*` stop with "benchmark report not found ... Run
+  `make tier1-benchmark DATASET=cicids2017` first." (exit 1) rather than
+  producing anything.
+- `gate.max_prob_threshold` / `gate.entropy_threshold` in `configs/config.yaml`
+  are still Phase-0 placeholders; after a real run they must be replaced with
+  the fitted values from `reports/gate_report.json`.
+- `tier1.calibration` is a single global method; per-family calibration (for
+  example isotonic for trees, temperature scaling for the MLP) is not supported.
+- ECE depends on `eval.calibration_bins` (15); values from runs with different
+  bin counts are not directly comparable.
+- Sigmoid calibration emits a `DeprecationWarning` from scikit-learn 1.5.2's
+  L-BFGS-B call under the installed SciPy 1.17. It is a third-party warning and
+  was left unsuppressed; it may disappear with a newer pinned scikit-learn.
+- The gate's zero-day measurement is only meaningful for the multiclass task
+  (see Decisions) and requires `preprocess.zeroday_classes` to be set.
+
+### Verification
+
+- `python -m pytest` -> 145 passed (35 new), `python -m ruff check src tests` ->
+  All checks passed; `make test` and `make lint` -> exit 0.
+- Three-stage CLI smoke on the synthetic fixture (benchmark 12 runs ->
+  calibrate 12 runs -> gate 12 runs) -> exit 0 at every stage; wrote
+  `tier1_benchmark.json`, `calibration_report.json`, `gate_report.json` and
+  their markdown tables plus 24 figures; every calibrator reloads in a fresh
+  interpreter (regression test).
+- Empty-data path: `make calibrate-cicids2017` and `make gate-cicids2017` each
+  print the benchmark-missing message and exit non-zero, leaving `reports/` and
+  `models/` without new artifacts.

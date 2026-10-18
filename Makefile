@@ -15,7 +15,7 @@ endif
 
 CONFIG ?= configs/config.yaml
 
-.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023 tier1-benchmark
+.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023 tier1-benchmark calibrate-cicids2017 calibrate-ciciot2023 gate-cicids2017 gate-ciciot2023
 
 setup: venv install dirs
 	@$(VENV_PY) -c "from src.config import load_config; c = load_config('$(CONFIG)'); print('config OK:', c.project_name, '| seed', c.seed, '| splits', c.split.train, c.split.val, c.split.test)"
@@ -71,6 +71,19 @@ DATASET ?= cicids2017
 
 tier1-benchmark:
 	@$(VENV_PY) -m src.tier1.train --dataset $(DATASET) --config $(CONFIG)
+
+# Phase 4: probability calibration and the confidence gate.
+calibrate-cicids2017:
+	@$(VENV_PY) -m src.tier1.calibrate --dataset cicids2017 --config $(CONFIG)
+
+calibrate-ciciot2023:
+	@$(VENV_PY) -m src.tier1.calibrate --dataset ciciot2023 --config $(CONFIG)
+
+gate-cicids2017:
+	@$(VENV_PY) -m src.gate.gate --dataset cicids2017 --config $(CONFIG)
+
+gate-ciciot2023:
+	@$(VENV_PY) -m src.gate.gate --dataset ciciot2023 --config $(CONFIG)
 
 clean:
 	@rm -rf $(VENV) .pytest_cache .ruff_cache

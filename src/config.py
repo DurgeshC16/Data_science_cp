@@ -240,7 +240,14 @@ class Tier1Config(BaseModel):
 
 
 class GateConfig(BaseModel):
-    """Confidence-gate thresholds (PLACEHOLDER values until Phase 3)."""
+    """Confidence-gate settings.
+
+    ``max_prob_threshold`` / ``entropy_threshold`` are PLACEHOLDERS: the fitted
+    values are computed on ``threshold_fit_split`` and written to
+    ``reports/gate_report.json``. A flow is escalated when its top probability
+    is below ``max_prob_threshold`` **or** its predictive entropy exceeds
+    ``entropy_threshold``.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -248,6 +255,19 @@ class GateConfig(BaseModel):
     entropy_threshold: float = Field(ge=0.0)
     target_escalation_rate_min: float = Field(ge=0.0, le=1.0)
     target_escalation_rate_max: float = Field(ge=0.0, le=1.0)
+    #: Score the gate with calibrated probabilities. When true, a fitted
+    #: calibrator artifact must exist for every scored run.
+    use_calibrated_probabilities: bool = True
+    #: Split used to fit the probability calibrator. ``calibration`` is the
+    #: dedicated Phase-2 split; ``val`` matches the wording in AGENTS.md. Either
+    #: way it is disjoint from train and test.
+    calibrator_fit_split: Literal["calibration", "val"] = "calibration"
+    #: Split used to fit the gate thresholds.
+    threshold_fit_split: Literal["val"] = "val"
+    #: Threshold grid resolution (quantile steps per score).
+    grid_steps: int = Field(default=101, ge=2)
+    #: Entropy units: natural log (nats) or base-2 (bits).
+    entropy_base: Literal["natural", "bits"] = "natural"
 
     @model_validator(mode="after")
     def _check_ranges(self) -> "GateConfig":
@@ -300,6 +320,8 @@ class EvalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_cap: int = Field(default=2000, gt=0)
+    #: Bins used for the expected-calibration-error and reliability diagrams.
+    calibration_bins: int = Field(default=15, ge=2)
     bootstrap_resamples: int = Field(default=1000, ge=0)
     confidence_level: float = Field(default=0.95, gt=0.0, lt=1.0)
     metrics: list[str] = Field(default_factory=list)

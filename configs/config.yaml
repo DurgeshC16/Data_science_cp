@@ -134,14 +134,24 @@ tier1:
     dropout: 0.1
     patience: 8
 
+# Phase 4: probability calibration and the confidence gate.
+# The calibrator is fitted on `calibrator_fit_split`; the gate thresholds are
+# fitted on `threshold_fit_split`. Both are disjoint from train and test, and the
+# fitted values are written to reports/calibration_report.json and
+# reports/gate_report.json. The thresholds below stay PLACEHOLDERS until then.
 gate:
-  # PLACEHOLDER thresholds; fitted on the validation split in Phase 3.
-  # A flow is escalated when max predicted probability is below
-  # `max_prob_threshold` OR predictive entropy exceeds `entropy_threshold`.
-  max_prob_threshold: 0.75
-  entropy_threshold: 1.0
+  max_prob_threshold: 0.75       # PLACEHOLDER, replaced by the fitted value
+  entropy_threshold: 1.0         # PLACEHOLDER, replaced by the fitted value
   target_escalation_rate_min: 0.05
   target_escalation_rate_max: 0.15
+  # Score the gate with calibrated probabilities (requires `make calibrate-*`).
+  use_calibrated_probabilities: true
+  # `calibration` is the dedicated Phase-2 split; `val` matches the wording in
+  # AGENTS.md. Either way it is disjoint from train and test.
+  calibrator_fit_split: calibration   # calibration | val
+  threshold_fit_split: val
+  grid_steps: 101                # quantile steps per score for the threshold grid
+  entropy_base: natural          # natural | bits
 
 shap:
   background_samples: 200
@@ -168,6 +178,7 @@ llm:
 
 eval:
   sample_cap: 2000            # cap on flows scored during evaluation
+  calibration_bins: 15        # ECE bins / reliability-diagram bins
   bootstrap_resamples: 1000
   confidence_level: 0.95
   metrics:

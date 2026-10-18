@@ -1067,6 +1067,92 @@ def load_tier1_model(path: Path) -> dict[str, Any]:
     raise ValueError(f"unsupported model artifact: {path}")
 
 
+def resolve_report_path(value: str | Path, root: Path = PROJECT_ROOT) -> Path:
+    """Resolve a path stored in a report against the project root.
+
+    Args:
+        value: absolute path, or a path relative to the project root.
+        root: project root used for relative values.
+
+    Returns:
+        An absolute :class:`~pathlib.Path`.
+    """
+    path = Path(value)
+    return path if path.is_absolute() else root / path
+
+
+def trained_model_from_artifact(
+    path: Path, task: str, family: str, seed: int
+) -> TrainedModel:
+    """Rebuild a :class:`TrainedModel` from a saved Tier-1 artifact.
+
+    Args:
+        path: ``.joblib`` (sklearn) or ``.pt`` (MLP) artifact written by
+            :func:`save_model`.
+        task: task name recorded on the model.
+        family: model family.
+        seed: seed recorded for the artifact.
+
+    Returns:
+        A :class:`TrainedModel` ready for prediction.
+
+    Raises:
+        ValueError: If the artifact does not contain the expected fields.
+    """
+    payload = load_tier1_model(path)
+    if path.suffix == ".pt":
+        estimator = payload["model"]
+        labels = payload["classes"]
+    else:
+        estimator = payload["estimator"]
+        labels = payload["labels"]
+    feature_columns = payload.get("feature_columns")
+    if not feature_columns or not labels:
+        raise ValueError(f"artifact {path} is missing feature columns or labels")
+    return TrainedModel(
+        family=family,
+        task=task,
+        seed=int(seed),
+        labels=list(labels),
+        feature_columns=list(feature_columns),
+        estimator=estimator,
+        params=dict(payload.get("params", {})),
+        training_time_seconds=0.0,
+    )
+
+
+def read_benchmark_runs(reports_dir: Path, dataset: str) -> list[dict[str, Any]]:
+    """Read the run records written by :func:`run_benchmark`.
+
+    Args:
+        reports_dir: directory holding ``tier1_benchmark.json``.
+        dataset: dataset that the report must belong to.
+
+    Returns:
+        The ``runs`` list from the benchmark report.
+
+    Raises:
+        FileNotFoundError: If the benchmark report does not exist.
+        ValueError: If the report was produced for a different dataset.
+    """
+    path = reports_dir / "tier1_benchmark.json"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"benchmark report not found: {path}\n"
+            f"Run `make tier1-benchmark DATASET={dataset}` first."
+        )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("dataset") != dataset:
+        raise ValueError(
+            f"benchmark report {path} is for dataset "
+            f"{payload.get('dataset')!r}, not {dataset!r}"
+        )
+    runs = payload.get("runs", [])
+    if not runs:
+        raise ValueError(f"benchmark report {path} contains no runs")
+    return list(runs)
+
+
 # ---------------------------------------------------------------------------
 # Aggregation and selection
 # ---------------------------------------------------------------------------

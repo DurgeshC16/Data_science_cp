@@ -19,8 +19,11 @@ _EXPORTS = frozenset(
         "fit_model",
         "load_processed_splits",
         "load_tier1_model",
+        "read_benchmark_runs",
+        "resolve_report_path",
         "run_benchmark",
         "select_default_model",
+        "trained_model_from_artifact",
         "tune_hyperparameters",
     }
 )
