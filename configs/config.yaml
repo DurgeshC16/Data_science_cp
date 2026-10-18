@@ -23,6 +23,9 @@ data:
   label_column: label
   flow_id_column: null
   drop_columns: []
+  # Optional: sample N rows for fast development. Set to null to use all data.
+  dev_sample: null
+  label_map: configs/label_map.yaml
 
 split:
   train: 0.70

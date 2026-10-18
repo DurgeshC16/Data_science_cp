@@ -41,6 +41,8 @@ class DataConfig(BaseModel):
     label_column: str = "label"
     flow_id_column: str | None = None
     drop_columns: list[str] = Field(default_factory=list)
+    dev_sample: int | None = Field(default=None, gt=0)
+    label_map: Path = Path("configs/label_map.yaml")
 
 
 class SplitConfig(BaseModel):

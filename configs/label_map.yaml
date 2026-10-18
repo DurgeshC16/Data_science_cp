@@ -1,0 +1,299 @@
+# configs/label_map.yaml
+# =============================================================================
+# Unified label taxonomy for Cascade-XID.
+#
+# Maps raw labels from CICIDS2017 (MachineLearningCVE) and CICIoT2023 to:
+#   - A 10-class unified taxonomy (multiclass_label)
+#   - A binary view (binary_label: Normal vs Attack)
+#
+# Taxonomy classes:
+#   Normal, DoS, DDoS, PortScan/Recon, BruteForce, WebAttack,
+#   Botnet/Mirai, Spoofing, Infiltration, Other
+#
+# Label strings are the values seen in the 'label' column AFTER loader
+# normalisation:
+#   - CICIDS2017: upper-cased, whitespace stripped, en/em-dashes -> "-"
+#   - CICIoT2023: whitespace stripped (verbatim PascalCase/mixed)
+#
+# Provenance:
+#   - CICIDS2017 labels: Sharafaldin et al. 2018, UNB CIC MachineLearningCVE
+#     README, and community analysis (Kaggle, GitHub).
+#   - CICIoT2023 labels: Neto et al. 2023 (arXiv:2303.04780), Mendeley Data
+#     readme, and community datasets on Kaggle.
+#
+# Uncertain mappings are flagged with  uncertain: true  and a note.
+# Do NOT remove the uncertain flag without verifying against the source paper.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# CICIDS2017 (MachineLearningCVE)
+# Labels as they appear after loader normalisation (upper-case, stripped).
+# ---------------------------------------------------------------------------
+cicids2017:
+
+  BENIGN:
+    multiclass_label: Normal
+    binary_label: Normal
+
+  FTP-PATATOR:
+    multiclass_label: BruteForce
+    binary_label: Attack
+
+  SSH-PATATOR:
+    multiclass_label: BruteForce
+    binary_label: Attack
+
+  DOS HULK:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  DOS GOLDENEYE:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  DOS SLOWLORIS:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  DOS SLOWHTTPTEST:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  HEARTBLEED:
+    # Heartbleed is an OpenSSL vulnerability exploit; it does not fit neatly
+    # into the other categories. Classified as Other because it is neither a
+    # volumetric DoS nor a brute-force attack -- it is a memory-disclosure
+    # exploit. Flagged uncertain because some papers classify it under
+    # WebAttack or Infiltration.
+    multiclass_label: Other
+    binary_label: Attack
+    uncertain: true
+    note: >
+      Heartbleed (CVE-2014-0160) is an OpenSSL memory-disclosure exploit.
+      Some benchmarks group it with WebAttack; others treat it as Infiltration.
+      Classified as Other pending further review.
+
+  "WEB ATTACK - BRUTE FORCE":
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  "WEB ATTACK - XSS":
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  "WEB ATTACK - SQL INJECTION":
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  INFILTRATION:
+    multiclass_label: Infiltration
+    binary_label: Attack
+
+  BOT:
+    multiclass_label: Botnet/Mirai
+    binary_label: Attack
+
+  PORTSCAN:
+    multiclass_label: PortScan/Recon
+    binary_label: Attack
+
+  DDOS:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+
+# ---------------------------------------------------------------------------
+# CICIoT2023
+# Labels as they appear after loader normalisation (stripped, verbatim casing).
+# ---------------------------------------------------------------------------
+ciciot2023:
+
+  BenignTraffic:
+    multiclass_label: Normal
+    binary_label: Normal
+
+  # --- DDoS ---
+  DDoS-ACK_Fragmentation:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-UDP_Fragmentation:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-ICMP_Fragmentation:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-SlowLoris:
+    # SlowLoris is application-layer; some papers classify as DoS.
+    # Placed under DDoS because the CICIoT2023 paper labels it DDoS.
+    multiclass_label: DDoS
+    binary_label: Attack
+    uncertain: true
+    note: >
+      SlowLoris is application-layer resource exhaustion. CICIoT2023 paper
+      groups it under DDoS; some frameworks classify it as DoS. Retained
+      as DDoS to match source dataset grouping.
+
+  DDoS-HTTP_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-TCP_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-UDP_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-ICMP_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-PSHACK_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-SYN_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-RSTFINFlood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  DDoS-SynonymousIP_Flood:
+    multiclass_label: DDoS
+    binary_label: Attack
+
+  # --- DoS ---
+  DoS-UDP_Flood:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  DoS-TCP_Flood:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  DoS-SYN_Flood:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  DoS-HTTP_Flood:
+    multiclass_label: DoS
+    binary_label: Attack
+
+  # --- Reconnaissance ---
+  Recon-HostDiscovery:
+    multiclass_label: PortScan/Recon
+    binary_label: Attack
+
+  Recon-OSScan:
+    multiclass_label: PortScan/Recon
+    binary_label: Attack
+
+  Recon-PortScan:
+    multiclass_label: PortScan/Recon
+    binary_label: Attack
+
+  Recon-PingSweep:
+    multiclass_label: PortScan/Recon
+    binary_label: Attack
+
+  VulnerabilityScan:
+    multiclass_label: PortScan/Recon
+    binary_label: Attack
+
+  # --- Mirai ---
+  Mirai-greip_flood:
+    multiclass_label: Botnet/Mirai
+    binary_label: Attack
+
+  Mirai-greeth_flood:
+    multiclass_label: Botnet/Mirai
+    binary_label: Attack
+
+  Mirai-udpplain:
+    multiclass_label: Botnet/Mirai
+    binary_label: Attack
+
+  # --- Spoofing ---
+  MITM-ArpSpoofing:
+    multiclass_label: Spoofing
+    binary_label: Attack
+
+  DNS_Spoofing:
+    multiclass_label: Spoofing
+    binary_label: Attack
+
+  # --- Web-based / Injection ---
+  CommandInjection:
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  SqlInjection:
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  XSS:
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  Uploading_Attack:
+    # File-upload attacks are typically classified as Web attacks.
+    multiclass_label: WebAttack
+    binary_label: Attack
+
+  # --- Brute Force ---
+  BruteForce-SSH:
+    multiclass_label: BruteForce
+    binary_label: Attack
+
+  BruteForce-Web:
+    multiclass_label: BruteForce
+    binary_label: Attack
+
+  DictionaryBruteForce:
+    multiclass_label: BruteForce
+    binary_label: Attack
+
+  # --- Malware / Backdoor ---
+  Backdoor_Malware:
+    # A backdoor implant is most similar to Infiltration (persistent access).
+    # Flagged uncertain because some frameworks place it under Botnet/Mirai.
+    multiclass_label: Infiltration
+    binary_label: Attack
+    uncertain: true
+    note: >
+      Backdoor_Malware represents a persistent remote access implant. Classified
+      as Infiltration (closest semantic match in the taxonomy). Some frameworks
+      group it with Botnet/Mirai. Flagged for review.
+
+
+# ---------------------------------------------------------------------------
+# Taxonomy summary
+# ---------------------------------------------------------------------------
+# multiclass_labels:
+#   - Normal
+#   - DoS
+#   - DDoS
+#   - PortScan/Recon
+#   - BruteForce
+#   - WebAttack
+#   - Botnet/Mirai
+#   - Spoofing
+#   - Infiltration
+#   - Other
+#
+# binary_labels:
+#   - Normal
+#   - Attack
+#
+# Uncertain entries (require expert review before use in production):
+#   CICIDS2017:
+#     - HEARTBLEED -> Other
+#   CICIoT2023:
+#     - DDoS-SlowLoris -> DDoS  (vs DoS)
+#     - Backdoor_Malware -> Infiltration  (vs Botnet/Mirai)

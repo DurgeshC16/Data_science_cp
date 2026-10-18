@@ -15,7 +15,7 @@ endif
 
 CONFIG ?= configs/config.yaml
 
-.PHONY: setup venv install dirs test lint clean
+.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023
 
 setup: venv install dirs
 	@$(VENV_PY) -c "from src.config import load_config; c = load_config('$(CONFIG)'); print('config OK:', c.project_name, '| seed', c.seed, '| splits', c.split.train, c.split.val, c.split.test)"
@@ -35,6 +35,26 @@ test:
 
 lint:
 	@$(VENV_PY) -m ruff check src tests
+
+# Phase 1: data loading and EDA
+# Optionally pass DEV_SAMPLE=50000 for fast development.
+DEV_SAMPLE ?=
+
+load-cicids2017:
+	@$(VENV_PY) -m src.data.loader --dataset cicids2017 --config $(CONFIG) \
+		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
+
+load-ciciot2023:
+	@$(VENV_PY) -m src.data.loader --dataset ciciot2023 --config $(CONFIG) \
+		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
+
+eda-cicids2017:
+	@$(VENV_PY) -m src.data.eda --dataset cicids2017 --config $(CONFIG) \
+		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
+
+eda-ciciot2023:
+	@$(VENV_PY) -m src.data.eda --dataset ciciot2023 --config $(CONFIG) \
+		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
 
 clean:
 	@rm -rf $(VENV) .pytest_cache .ruff_cache
