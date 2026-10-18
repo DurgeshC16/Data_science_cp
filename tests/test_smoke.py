@@ -7,7 +7,6 @@ so they run in a couple of seconds and can gate every commit.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -44,10 +43,23 @@ def test_required_directory_exists(relative_path: str) -> None:
 
 
 def test_config_loads_and_is_pinned_to_seed_42() -> None:
-    """Config parses, uses seed 42 and splits that sum to one."""
+    """Config parses, uses seed 42 and four splits that sum to one."""
     config = load_config()
     assert config.seed == 42
-    assert config.split.train + config.split.val + config.split.test == pytest.approx(1.0)
+    total = (
+        config.split.train
+        + config.split.val
+        + config.split.calibration
+        + config.split.test
+    )
+    assert total == pytest.approx(1.0)
+    # The 60/10/10/20 contract from the phase-2 specification.
+    assert (config.split.train, config.split.val, config.split.calibration, config.split.test) == (
+        pytest.approx(0.60),
+        pytest.approx(0.10),
+        pytest.approx(0.10),
+        pytest.approx(0.20),
+    )
     assert config.eval.sample_cap > 0
     assert (
         config.gate.target_escalation_rate_min

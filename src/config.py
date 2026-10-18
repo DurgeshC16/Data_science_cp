@@ -46,20 +46,55 @@ class DataConfig(BaseModel):
 
 
 class SplitConfig(BaseModel):
-    """Train/validation/test fractions. Must sum to 1."""
+    """Train/validation/calibration/test fractions. Must sum to 1.
+
+    The calibration split is reserved for fitting the probability calibrator and
+    the gate thresholds. It must never be used for model training.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     train: float = Field(gt=0.0, lt=1.0)
     val: float = Field(gt=0.0, lt=1.0)
+    calibration: float = Field(default=0.10, gt=0.0, lt=1.0)
     test: float = Field(gt=0.0, lt=1.0)
     stratify: bool = True
 
     @model_validator(mode="after")
     def _ratios_sum_to_one(self) -> "SplitConfig":
-        total = self.train + self.val + self.test
+        total = self.train + self.val + self.calibration + self.test
         if abs(total - 1.0) > 1e-6:
             raise ValueError(f"split ratios must sum to 1.0, got {total:.6f}")
+        return self
+
+
+class PreprocessConfig(BaseModel):
+    """Cleaning, splitting and train-only preprocessing settings.
+
+    ``class_weighting`` only controls class weights handed to the Tier-1 model;
+    this project never resamples rows (no oversampling) before splitting.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    impute_strategy: Literal["median", "mean", "drop_rows"] = "median"
+    max_column_missing_fraction: float = Field(default=0.30, ge=0.0, le=1.0)
+    drop_constant_columns: bool = True
+    drop_duplicate_rows: bool = True
+    scaling: Literal["standard", "robust", "none"] = "standard"
+    class_weighting: Literal["none", "balanced"] = "balanced"
+    identifier_patterns: list[str] = Field(default_factory=list)
+    extra_identifier_columns: list[str] = Field(default_factory=list)
+    zeroday_classes: list[str] = Field(default_factory=list)
+    zeroday_max_classes: int = Field(default=2, ge=1)
+
+    @model_validator(mode="after")
+    def _check_zeroday(self) -> "PreprocessConfig":
+        if len(self.zeroday_classes) > self.zeroday_max_classes:
+            raise ValueError(
+                "zeroday_classes has more entries than zeroday_max_classes "
+                f"({len(self.zeroday_classes)} > {self.zeroday_max_classes})"
+            )
         return self
 
 
@@ -151,6 +186,7 @@ class Config(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     split: SplitConfig
+    preprocess: PreprocessConfig = Field(default_factory=PreprocessConfig)
     tier1: Tier1Config = Field(default_factory=Tier1Config)
     gate: GateConfig
     shap: ShapConfig = Field(default_factory=ShapConfig)

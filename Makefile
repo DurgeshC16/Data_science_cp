@@ -15,7 +15,7 @@ endif
 
 CONFIG ?= configs/config.yaml
 
-.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023
+.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023
 
 setup: venv install dirs
 	@$(VENV_PY) -c "from src.config import load_config; c = load_config('$(CONFIG)'); print('config OK:', c.project_name, '| seed', c.seed, '| splits', c.split.train, c.split.val, c.split.test)"
@@ -54,6 +54,15 @@ eda-cicids2017:
 
 eda-ciciot2023:
 	@$(VENV_PY) -m src.data.eda --dataset ciciot2023 --config $(CONFIG) \
+		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
+
+# Phase 2: leakage-safe preprocessing and stratified splits.
+preprocess-cicids2017:
+	@$(VENV_PY) -m src.data.preprocess --dataset cicids2017 --config $(CONFIG) \
+		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
+
+preprocess-ciciot2023:
+	@$(VENV_PY) -m src.data.preprocess --dataset ciciot2023 --config $(CONFIG) \
 		$(if $(DEV_SAMPLE),--dev-sample $(DEV_SAMPLE),)
 
 clean:

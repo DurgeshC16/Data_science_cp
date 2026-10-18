@@ -24,9 +24,7 @@ from __future__ import annotations
 
 import logging
 import sys
-import textwrap
 from pathlib import Path
-from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -267,7 +265,7 @@ def _build_report(
     # 1. Shape and dtypes
     # ------------------------------------------------------------------
     add("## 1. Shape\n")
-    add(f"| Rows | Columns |")
+    add("| Rows | Columns |")
     add("|------|---------|")
     add(f"| {len(df):,} | {df.shape[1]} |\n")
 

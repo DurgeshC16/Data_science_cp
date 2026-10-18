@@ -28,10 +28,56 @@ data:
   label_map: configs/label_map.yaml
 
 split:
-  train: 0.70
-  val: 0.15
-  test: 0.15
+  # 60 / 10 / 10 / 20, stratified on the unified multiclass label.
+  # `calibration` is reserved for probability calibration and gate thresholds;
+  # it is NEVER used to fit the Tier-1 model.
+  train: 0.60
+  val: 0.10
+  calibration: 0.10
+  test: 0.20
   stratify: true
+
+preprocess:
+  # inf is already converted to NaN by the loader; repeated defensively here.
+  # median is the default because flow-feature distributions are heavy-tailed
+  # and dropping rows would erase whole attack classes.
+  impute_strategy: median          # median | mean | drop_rows
+  # Feature columns missing more than this fraction IN TRAIN are dropped.
+  max_column_missing_fraction: 0.30
+  drop_constant_columns: true
+  drop_duplicate_rows: true        # exact duplicates removed BEFORE any split
+  scaling: standard                # standard | robust | none (fit on train only)
+  # Class imbalance is handled with model class weights only. Rows are never
+  # resampled/oversampled, and nothing is resampled before splitting.
+  class_weighting: balanced        # none | balanced
+  # Columns matching these regexes are identifiers that enable shortcut
+  # learning (IPs, flow ids, timestamps, MACs, host addresses) and are dropped.
+  # Note: `destination_port` is deliberately NOT matched and is retained; see
+  # docs/PROGRESS.md (Phase 2) for the shortcut risk it carries.
+  identifier_patterns:
+    - "(^|_)ip(_|$)"
+    - "(^|_)ips?$"
+    - "(^|_)flow_id(_|$)"
+    - "(^|_)timestamp(_|$)"
+    - "(^|_)mac(_|$)"
+    - "(^|_)address(_|$)"
+    - "(^|_)src(_|$)"
+    - "(^|_)dst(_|$)"
+    - "(^|_)host(_|$)"
+  extra_identifier_columns: []
+  # Zero-day simulation: classes removed from train/val/calibration/test and
+  # written to data/processed/zeroday_test.parquet. Entries may be either a
+  # unified class ("Other") or a raw dataset label ("HEARTBLEED"); raw labels
+  # are mapped through configs/label_map.yaml.
+  #
+  # Candidates proposed after inspecting the label inventory (SEMANTIC rarity;
+  # measured counts are not available because data/raw is empty, so the EDA
+  # numbers are "not measured"):
+  #   CICIDS2017  : "HEARTBLEED", "WEB ATTACK - SQL INJECTION"
+  #   CICIoT2023  : "Backdoor_Malware", "Uploading_Attack"
+  # Set this list for the dataset actually loaded, then rerun preprocessing.
+  zeroday_classes: []
+  zeroday_max_classes: 2
 
 tier1:
   model: random_forest        # random_forest | xgboost
