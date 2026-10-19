@@ -1,0 +1,48 @@
+# Draft label-to-technique candidates. This is not a confirmed ground truth:
+# every mapping requires human verification before accuracy is interpreted.
+version: 1
+purpose: tier1_lookup_and_tier2_mapping_evaluation_reference
+source: MITRE ATT&CK Enterprise live technique pages (accessed 2026-10-19)
+labels:
+  Normal:
+    candidates: []
+    needs_human_verification: true
+  DoS:
+    candidates:
+      - id: T1498
+        name: Network Denial of Service
+        source: https://attack.mitre.org/techniques/T1498/
+    needs_human_verification: true
+  DDoS:
+    candidates:
+      - id: T1498
+        name: Network Denial of Service
+        source: https://attack.mitre.org/techniques/T1498/
+    needs_human_verification: true
+  PortScan/Recon:
+    candidates:
+      - id: T1046
+        name: Network Service Discovery
+        source: https://attack.mitre.org/techniques/T1046/
+    needs_human_verification: true
+  BruteForce:
+    candidates:
+      - id: T1110
+        name: Brute Force
+        source: https://attack.mitre.org/techniques/T1110/
+    needs_human_verification: true
+  WebAttack:
+    candidates: []
+    needs_human_verification: true
+  Botnet/Mirai:
+    candidates: []
+    needs_human_verification: true
+  Spoofing:
+    candidates: []
+    needs_human_verification: true
+  Infiltration:
+    candidates: []
+    needs_human_verification: true
+  Other:
+    candidates: []
+    needs_human_verification: true

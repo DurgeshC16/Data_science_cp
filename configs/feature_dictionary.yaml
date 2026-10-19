@@ -1,0 +1,21 @@
+# Plain-English feature meanings and value rendering.
+# Add an entry for every feature in models/<dataset>_features.json after a real
+# dataset has been preprocessed. Unknown meanings must remain TODO, not inferred.
+version: 1
+features: {}
+default_meaning: "TODO: add a reviewed plain-English meaning for this feature."
+
+# Percentile cut points are fitted from the training split at runtime and stored
+# with the fitted dictionary. Validation, calibration, and test rows never set
+# these cut points.
+percentile_rules:
+  method: train_quantiles
+  quantiles: [0.25, 0.50, 0.75]
+  words:
+    below_p25: low
+    p25_to_p75: typical
+    above_p75: high
+  # Add feature-specific wording only where the physical meaning is known.
+  # E.g. duration can use “short burst” only after its unit and semantics have
+  # been verified against the dataset's feature documentation.
+  overrides: {}

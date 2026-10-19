@@ -156,13 +156,25 @@ gate:
 shap:
   background_samples: 200
   max_display_features: 10
+  top_k_features: 3
+  benchmark_calls: 100
+  benchmark_warmup_calls: 10
+  feature_dictionary_path: configs/feature_dictionary.yaml
+  attack_lookup_path: configs/attack_lookup.yaml
 
 rag:
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  index_path: data/kb/faiss.index
-  passages_path: data/kb/passages.jsonl
+  index_path: models/kb_index/faiss.index
+  passages_path: models/kb_index/documents.jsonl
   top_k: 5
   min_score: 0.0
+  chunk_tokens: 300
+  overlap_tokens: 50
+  embedding_batch_size: 64
+  hybrid_alpha: 0.5
+  cve_path: data/kb/cve_curated.csv
+  retrieval_eval_path: data/kb/retrieval_eval.csv
+  retrieval_report_path: reports/retrieval_eval.json
 
 llm:
   backend: ollama             # ollama | llamacpp
@@ -174,7 +186,13 @@ llm:
   # Guardrail: reject answers whose ATT&CK/CVE identifiers are not present in the
   # retrieved evidence (see docs/PROGRESS.md, Phase 0 decisions).
   require_grounded_ids: true
-  max_retries: 1
+  max_retries: 2                 # at most two retries after the initial call
+  cache_path: models/tier2_cache.json
+
+pipeline:
+  batch_size: 256
+  tier2_concurrency: 4
+  run_stats_path: reports/run_stats.json
 
 eval:
   sample_cap: 2000            # cap on flows scored during evaluation

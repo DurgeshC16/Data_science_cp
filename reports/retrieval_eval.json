@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-10-19T09:38:28+00:00",
+  "git_commit": "ad81c17c214d51652e9a6b372b1d016d3d416c7c",
+  "git_worktree_dirty": true,
+  "attack_version": "20.0",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "config": {
+    "top_k": 5,
+    "chunk_tokens": 300,
+    "overlap_tokens": 50,
+    "hybrid_alpha": 0.5
+  },
+  "evaluation_queries": "C:\\Users\\durge\\Documents\\System Desktop\\Projects\\Data Science\\data\\kb\\retrieval_eval.csv",
+  "all_queries_need_human_review": true,
+  "metrics": {
+    "dense": {
+      "n_queries": 60,
+      "recall_at_1": 0.03333333333333333,
+      "recall_at_3": 0.15,
+      "recall_at_5": 0.36666666666666664,
+      "mrr": 0.1225
+    },
+    "hybrid": {
+      "n_queries": 60,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.1,
+      "recall_at_5": 0.15,
+      "mrr": 0.05444444444444444
+    }
+  },
+  "dense_recall_at_3_warning": {
+    "flagged": true,
+    "reason": "dense Recall@3 is below 0.70",
+    "suggested_fixes": [
+      "Review expected technique IDs and query wording with a human; all supplied rows are explicitly unverified.",
+      "Add sourced ATT&CK detection guidance or curated CVE passages relevant to the query vocabulary.",
+      "Tune chunk size/overlap and embedding model using a held-out, human-reviewed query set.",
+      "Compare hybrid results and inspect false negatives before changing retrieval thresholds."
+    ]
+  },
+  "definitions": {
+    "recall_at_k": "fraction of each row's expected IDs appearing in top-k results, averaged over rows",
+    "mrr": "mean reciprocal rank of the first expected ID",
+    "hybrid": "weighted sum of min-max normalized cosine and Okapi BM25 scores"
+  },
+  "report_path": "C:\\Users\\durge\\Documents\\System Desktop\\Projects\\Data Science\\reports\\retrieval_eval.json"
+}

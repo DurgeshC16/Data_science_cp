@@ -1,0 +1,20 @@
+{
+  "source_url": "https://github.com/mitre-attack/attack-stix-data/releases/download/v20.0/enterprise-attack.json",
+  "attack_version": "20.0",
+  "download_date": "2026-10-19",
+  "bundle_path": "data\\kb\\enterprise-attack.json",
+  "bundle_sha256": "81113ba98afa2928f3dcff62022539f7ce30c315c32e14422f11ff95ce534352",
+  "generated_at": "2026-10-19T09:38:21+00:00",
+  "git_commit": "ad81c17c214d51652e9a6b372b1d016d3d416c7c",
+  "git_worktree_dirty": true,
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dimension": 384,
+  "document_chunks": 1133,
+  "unique_technique_ids": 706,
+  "cve_documents": 0,
+  "chunk_tokens": 300,
+  "overlap_tokens": 50,
+  "embedding_batch_size": 64,
+  "index_path": "C:\\Users\\durge\\Documents\\System Desktop\\Projects\\Data Science\\models\\kb_index\\faiss.index",
+  "passages_path": "C:\\Users\\durge\\Documents\\System Desktop\\Projects\\Data Science\\models\\kb_index\\documents.jsonl"
+}

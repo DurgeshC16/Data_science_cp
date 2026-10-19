@@ -552,3 +552,397 @@ actually exists; no metric below is invented._
 - Empty-data path: `make calibrate-cicids2017` and `make gate-cicids2017` each
   print the benchmark-missing message and exit non-zero, leaving `reports/` and
   `models/` without new artifacts.
+
+---
+
+## Phase 1–4 real-data verification attempt (2026-10-19) — BLOCKED
+
+### Done
+
+- Confirmed the checked-out branch is local `master` (4 commits ahead of
+  `origin/main`); the working tree was clean before this entry.
+- Ran `make test`: **145 passed**, 6 SciPy `disp`/`iprint` deprecation warnings,
+  exit 0 (54.81 s).
+- Ran `make lint`: Ruff reported all checks passed, exit 0.
+- Reviewed `src/data/preprocess.py`, `src/tier1/train.py`,
+  `src/tier1/calibrate.py` and `src/gate/gate.py` for leakage, selection and
+  random seeds. Prioritised observations were reported in the session before
+  this log edit: (1) the calibration default uses the dedicated calibration
+  split while `AGENTS.md` says validation; (2) candidate selection uses p95
+  latency measured on test rows (but does not use test labels); (3) duplicate
+  removal includes the raw label despite being described as label-free. No
+  unseeded stochastic operation was identified in the reviewed paths.
+- Checked `data/raw/`: it contains only `.gitkeep`; neither
+  `data/raw/cicids2017/` nor `data/raw/ciciot2023/` contains CSV files.
+
+### Blocker and next action
+
+- Real-data pipeline not run. `load`, EDA, preprocessing, Tier-1 benchmark,
+  calibration, and gate were all stopped before execution because no real
+  dataset is present. DEV_SAMPLE smoke and full-data runs are both **not
+  measured**. No zero-day classes, model default, or fitted gate thresholds
+  were selected or written; existing config values remain unchanged.
+- To unblock CICIDS2017, download the **MachineLearningCVE** ZIP (the 8 daily
+  CSV archive, approximately 450 MB) from the official UNB CIC page:
+  <https://www.unb.ca/cic/datasets/ids-2017.html> (free registration), or use
+  the mirror listed by `src/data/loader.py`:
+  <http://205.174.165.80/CICDataset/CIC-IDS-2017/Dataset/MachineLearningCVE.zip>.
+  Extract all eight `*.csv` files directly into `data/raw/cicids2017/`. The
+  loader lists the expected capture-day filenames and records the dataset
+  licence as CC BY 4.0; retain/cite the UNB CIC source.
+- CICIoT2023 was also absent. It is optional for the CICIDS2017 run. If wanted,
+  download the preprocessed CSV archive from the official UNB page
+  <https://www.unb.ca/cic/datasets/iotdataset-2023.html>, or the all-parts
+  Mendeley archive (DOI `10.17632/7zcswnmkfd`, approximately 8.6 GB) at
+  <https://data.mendeley.com/datasets/7zcswnmkfd>, and place extracted CSVs in
+  `data/raw/ciciot2023/`. Confirm source terms/licence when downloading; the
+  loader documents CC BY 4.0 and citation of the UNB CIC IoT 2023 paper.
+
+### Open issues
+
+- Once CICIDS2017 CSVs are present, rerun the requested pipeline in order,
+  first with `DEV_SAMPLE=<N>` for a smoke run, then on the full data. Derive
+  zero-day choices from that dataset's measured EDA counts before preprocessing.
+- Append measured Phase 1–4 verification results only after successful real
+  runs. Then set `tier1.model` from the benchmark `chosen_default` and replace
+  gate placeholders only with the fitted values in the gate report.
+
+---
+
+## Tier-1 explanations and ATT&CK lookup (2026-10-19) — PARTIAL
+
+### Done
+
+- Added `src/explain/shap_explainer.py` with cached SHAP `TreeExplainer` support
+  for binary Random Forest / XGBoost models, top-k signed Attack contributions,
+  absolute magnitudes, train-only percentile fitting, qualitative wording, and a
+  configurable per-flow timing helper. Positive SHAP values are toward the
+  model's `Attack` output; negative values are toward `Normal`. MLP and
+  multiclass models are rejected rather than assigned an ambiguous direction.
+- Added `configs/feature_dictionary.yaml`. Since no processed feature artifact
+  exists, feature-specific meanings remain empty and the fallback is explicitly
+  `TODO`; percentile words are derived from training rows when a feature list is
+  available. No dataset-specific feature meanings or percentile cut points have
+  been inferred.
+- Added `src/explain/attack_lookup.py` and `configs/attack_lookup.yaml`. Draft
+  candidates are recorded for DoS/DDoS (`T1498`, Network Denial of Service),
+  PortScan/Recon (`T1046`, Network Service Discovery), and BruteForce (`T1110`,
+  Brute Force). All taxonomy entries are marked
+  `needs_human_verification: true`; candidate entries cite their MITRE ATT&CK
+  technique pages. Empty candidate lists are intentional, not a claim that no
+  technique applies.
+- Added `retrieval_query` to combine protocol, port, explicitly supplied service
+  name, and qualitative SHAP feature descriptions. Service names are not
+  inferred from ports.
+- Added `tests/test_explain.py` for deterministic Tree SHAP output shape,
+  train-percentile wording, query construction, candidate verification flags,
+  unsupported-model rejection, and the timing helper's output contract. These
+  are unit tests with a small synthetic tree, not the project report's worked
+  flows.
+- Added SHAP and feature/lookup/timing settings to `configs/config.yaml` and its
+  typed config model.
+
+### Verification and limitations
+
+- `make test` -> **151 passed**, 918 warnings, exit 0 (2026-10-19). Warnings
+  include SHAP plotting-color deprecations and the existing scikit-learn/SciPy
+  calibration deprecations.
+- `make lint` -> all checks passed (2026-10-19).
+- Environment repair: installed declared `shap==0.46.0` and restored declared
+  `numpy==1.26.4`, `pandas==2.2.3`, and `pyarrow==17.0.0` in `.venv`. These are
+  environment changes only; project dependency declarations were not changed.
+- Actual Tier-1 SHAP per-flow overhead: **not measured**. There is no trained
+  model artifact under `models/`, and the repository contains no project report
+  with the specified normal HTTPS, SYN flood, and ambiguous SMB examples.
+  Consequently, acceptance tests against those exact examples were not
+  possible; no substitute flow values or real-model timing were fabricated.
+- Feature-specific dictionary coverage is **not complete** until a real
+  `models/<dataset>_features.json` is available and every listed feature has a
+  reviewed meaning. The TODO fallback is deliberate.
+- The ATT&CK mapping remains a draft and is not validated ground truth until a
+  human reviews each label-to-technique association.
+
+### Open issues
+
+- Provide the report path or the three worked-example records and a fitted
+  binary tree-model artifact to complete exact-example tests and measure
+  per-flow overhead.
+- After real preprocessing, populate and review `configs/feature_dictionary.yaml`
+  for every model feature; fit its percentile cut points only on the training
+  split.
+- Human-review the ATT&CK candidates before using the lookup as Tier-2 mapping
+  ground truth or publishing mapping accuracy.
+
+---
+
+## Local ATT&CK/CVE knowledge base and retrieval (2026-10-19)
+
+### Done
+
+- Downloaded `data/kb/enterprise-attack.json` from the official
+  `mitre-attack/attack-stix-data` GitHub release (`v20.0`). Download date:
+  2026-10-19. Verified file size **55,271,014 bytes** and SHA-256
+  `81113ba98afa2928f3dcff62022539f7ce30c315c32e14422f11ff95ce534352` against
+  the release asset metadata. Source record is in `data/kb/attack_source.json`.
+- Added `src/rag/build_kb.py`: parses active ATT&CK `attack-pattern` objects,
+  including sub-techniques; excludes revoked/deprecated objects; retains IDs,
+  names, tactics, description, detection guidance and platforms; chunks source
+  text with configured overlap and repeats identity/metadata in each chunk.
+- Added the curator-owned `data/kb/cve_curated.csv` template with exactly three
+  clearly marked example-placeholder rows. No CVE identifier or description was
+  supplied from memory; example rows are excluded from the index.
+- Added configurable Sentence Transformers embeddings and a normalized FAISS
+  inner-product index under `models/kb_index/`, with passage metadata in
+  `documents.jsonl`. Current encoder: `sentence-transformers/all-MiniLM-L6-v2`;
+  switching is configurable through `rag.embedding_model`.
+- Added `src/rag/retriever.py` with `retrieve(query, k=3)` dense retrieval and
+  optional BM25+dense hybrid ranking. Results include text, technique/CVE ID,
+  score and metadata.
+- Added `data/kb/retrieval_eval.csv` with **60** SHAP-style query candidates.
+  Expected technique IDs are validated against `configs/attack_lookup.yaml`;
+  every row has `needs_review=true` because mappings and queries are unreviewed.
+- Added `make kb-build` (builds index and runs evaluation) and `make kb-eval`.
+  Evaluation JSON and Markdown are saved as `reports/retrieval_eval.json` and
+  `.md`; reports include configuration, source version and Git provenance.
+- `make kb-build` completed successfully: **706 unique technique IDs**, **1,133
+  text chunks**, 384-dimensional vectors; no curated CVE documents were indexed.
+
+### Measured retrieval evaluation (provisional; queries need human review)
+
+Using the 60 currently unreviewed query rows and the real ATT&CK v20.0 index:
+
+| Mode | Recall@1 | Recall@3 | Recall@5 | MRR |
+| --- | ---: | ---: | ---: | ---: |
+| Dense | 0.0333 | 0.1500 | 0.3667 | 0.1225 |
+| Hybrid | 0.0000 | 0.1000 | 0.1500 | 0.0544 |
+
+- Dense Recall@3 is **below 0.70** and is flagged in the report with suggested
+  fixes. Hybrid is worse on this provisional evaluation; it is reported as
+  measured, not hidden. Do not treat these metrics as validated retrieval
+  quality until a human reviews the candidate labels and queries.
+- `make test` -> **157 passed**, 918 warnings, exit 0. Warnings are third-party
+  SHAP/scikit-learn deprecations.
+- `make lint` -> all checks passed, exit 0.
+
+### Open issues
+
+- Human-review all retrieval evaluation rows and ATT&CK label mappings. Then
+  rerun `make kb-eval`; expected technique IDs are provisional, not ground truth.
+- Curate CVE records from cited authoritative sources before indexing them. The
+  current CVE document count is zero by design.
+- Dense and hybrid retrieval quality is currently poor against the unreviewed
+  candidate set. Use the report's suggested fixes and rerun measurement after
+  reviewing query/label validity; do not tune against test data later used for a
+  final report.
+
+---
+
+## Tier-2 strict LLM explainer (2026-10-19) — IMPLEMENTED, REAL-MODEL RUN BLOCKED
+
+### Done
+
+- Added `src/tier2/llm_backend.py`: abstract `LLMBackend`, local Ollama
+  `/api/generate` client, and deterministic `MockBackend`. Ollama model tag,
+  temperature, token limit and timeout come from `configs/config.yaml`. Calls
+  log prompt tokens, output tokens and latency; failed HTTP calls log estimated
+  prompt tokens, zero output tokens and measured request latency.
+- Added `src/tier2/prompt.py` with the requested prompt as version `prompt_v1`.
+- Added `src/tier2/validate.py`: strict Pydantic JSON schema, 3–4 sentence
+  explanation check, canonical technique ID/name validation against the built
+  local ATT&CK passages (or source STIX bundle), retrieved-passage grounding
+  warning, and flags for numeric explanation values absent from flow/SHAP input.
+  Failed generation or validation retries up to the configured maximum of two
+  retries, then returns `Needs Human Review` while retaining `tier1_verdict`.
+- Every parsed Tier-2 result includes `prompt_version`; `Tier2Run` carries raw
+  response(s), parsed response, model, attempt count, per-call telemetry and
+  cache status. Result cache keys are SHA-256 of canonical flow JSON, prompt
+  version and model tag. Raw and parsed runs can be saved to
+  `reports/tier2_samples/` through `save_tier2_sample`.
+- Added mock tests for valid JSON, malformed JSON and retries, a source-backed
+  technique ID absent from the supplied test KB, timeout fallback, retrieval and
+  numeric-value warnings, prompt provenance and cache hits.
+- The existing `OutputRecord` schema was not changed: Tier-2's requested
+  categorical confidence and response contract are represented in a separate
+  validated Tier-2 result. The original nine-field final pipeline record
+  remains intact until an end-to-end adapter is specified.
+
+### Verification and real-model blocker
+
+- `make test` -> **164 passed**, 918 third-party warnings, exit 0.
+- `make lint` -> all checks passed, exit 0.
+- Local Ollama probe at `http://localhost:11434/api/tags` -> connection refused;
+  no local model tag or response was available. Real model used: **not
+  measured**. Real per-call prompt/output token counts and latency: **not
+  measured**. No raw/parsed real-model samples were saved.
+- The repository has no report containing the three worked example flows, so
+  those examples were not reconstructed or replaced with fabricated inputs.
+  Mock tests are code-path tests only, not real flow explanations.
+
+### Open issues
+
+- Start Ollama and pull/configure a local model tag (for example the user-listed
+  model names), then rerun the three report examples and save raw/parsed outputs
+  under `reports/tier2_samples/`.
+- Provide the report location or example flow, SHAP and passage inputs. The
+  example-level acceptance and real-model latency measurement remain blocked.
+- The returned Tier-2 structure is separate from `OutputRecord`; wiring it into
+  the full pipeline requires an explicit policy for converting categorical
+  confidence to the final record's numeric confidence without guessing.
+
+---
+
+## Demo and report draft (2026-10-19) — UI/DOCS IMPLEMENTED, RUN BLOCKED
+
+### Done
+
+- Added `app/demo.py` and `make demo`. The Streamlit app accepts CSV uploads,
+  lets users select rows from the uploaded file, displays Tier-1 confidence and
+  gate routing, and for escalations presents the report card, ATT&CK link,
+  recommended action, retrieved evidence and SHAP contribution chart when those
+  artifacts are available. A live escalation counter updates during processing.
+- Cost savings are shown only after the user enters prompt/output token prices.
+  The displayed all-flows baseline assumes one call per flow at the mean observed
+  per-call token count; this assumption is labeled in the UI. Without a priced
+  uncached LLM call, cost is reported as not estimated. No token prices are
+  hard-coded.
+- Built-in sample flows were not added because the repository's report examples
+  and real datasets are absent. Users can choose sample rows from their uploaded
+  CSV instead. When fitted artifacts are missing, the app displays the blocker
+  and does not generate placeholder predictions.
+- Added `reports/draft_report.md` with the requested sections, TODO markers for
+  unsupported claims, and citations to existing report files for numeric results.
+  The only metric table uses the provisional retrieval figures in
+  `reports/retrieval_eval.json`, explicitly marked unreviewed.
+- Added `reports/expectations_audit.md`. The original report is not present in
+  this repository, so the audit covers only expectations discoverable in
+  `AGENTS.md`, config and current result reports; it does not claim to enumerate
+  the missing report's every statement.
+- Rewrote `README.md` with clean-clone setup, official dataset and ATT&CK source
+  instructions, available pipeline commands, demo/cascade commands, repository
+  layout and a clear note that E1–E7 experiment targets are not yet implemented.
+
+### Verification and limitations
+
+- Streamlit `AppTest` rendered the landing state with no flow upload and no
+  trained artifacts; no predictions were made.
+- `make test` -> **168 passed**, 918 third-party warnings, exit 0.
+- `make lint` -> all checks passed. `ruff check app` -> all checks passed.
+- The UI cannot complete a cascade run here: `data/raw/` and `data/processed/`
+  contain only `.gitkeep`; Tier-1 benchmark/gate reports and model artifacts are
+  absent; Ollama is unavailable. Full upload-to-record behavior is therefore not
+  measured.
+- A clean clone can install the pinned software and follow documented data
+  setup, but it cannot reproduce E1–E7: those Make targets/runners do not exist
+  yet, and the requisite data, artifacts, human-reviewed mapping and local model
+  must be supplied first. No Pareto figure or experimental values were added.
+
+### Open issues
+
+- Supply the original report if a complete expectation-by-expectation audit is
+  required, plus the report's example CSV flows if they are to be offered as
+  curated demo samples.
+- Run `make demo` after downloading real data, creating benchmark/calibration/
+  gate/model artifacts, building the KB and starting Ollama. Verify all UI
+  outputs against the real records and `OutputRecord` schema.
+- Implement and validate the E1–E7 experiment targets before claiming clean-clone
+  reproduction of the full experiment suite.
+
+---
+
+## Full cascade orchestration (2026-10-19) — IMPLEMENTED, DATA RUN DEFERRED
+
+### Done
+
+- Added `src/pipeline/cascade.py` with batched Tier-1 inference, optional fitted
+  probability calibration, fitted gate-profile selection from the gate report's
+  validation sweep, and ordered per-flow outputs. Only gate-escalated rows enter
+  the concurrent Tier-2 executor.
+- Tier-1-only outputs use the static ATT&CK lookup when a multiclass label has a
+  candidate, and explicitly disclose that draft tags require human verification.
+  Tier-2 routes through SHAP, retrieval query construction, local retrieval,
+  LLM validation and fallback handling.
+- Every output passes `OutputRecord` and retains exactly its nine AGENTS.md
+  fields. Categorical Tier-2 confidence is not converted to a guessed numeric
+  scale; the canonical record retains the calibrated Tier-1 numeric confidence.
+- Added iterator/streaming and batch APIs, vectorized Tier-1 batches, a
+  configurable Tier-2 concurrency limit, and JSONL writing. Run stats include
+  total/escalated flows, LLM attempts, cache hits, failed attempts, fallbacks,
+  per-stage latency aggregates and prompt/output token totals; the configured
+  destination defaults to `reports/run_stats.json`.
+- Added `python -m src.cli run --input ... --gate-profile p10 --out ...`, plus a
+  `run-cascade` Make target. Artifact loading requires the benchmark-selected
+  model, fitted preprocessor, gate sweep and configured KB index; it does not
+  invent thresholds or substitute unprocessed input features.
+- Added synthetic routing integration tests for the described Normal, SYN-flood,
+  and ambiguous-SMB scenarios. The tests assert routing, schema, static tagging,
+  vectorized batches and counters; they are explicitly not the report's exact
+  flow records.
+- Made Tier-2 cache writes merge under a lock so concurrent escalated rows do
+  not overwrite one another's cache entries.
+
+### Verification and deferred acceptance runs
+
+- `make test` -> **167 passed**, 918 third-party warnings, exit 0.
+- `make lint` -> all checks passed, exit 0.
+- CLI help was verified for `python -m src.cli run`.
+- The report with the three original flow records is not present; exact report
+  reproduction was not possible. `data/raw/` still lacks real flow data and
+  there are no Tier-1 benchmark/model/preprocessor/gate artifacts.
+- Per the user's request to run the full project after phases are complete, the
+  10,000-flow mock run and the 200-flow real-model run are **deferred, not
+  measured**. No `reports/run_stats.json` from a real project run or
+  `reports/tier2_samples/` real-model outputs were generated.
+- Local Ollama was previously probed at `http://localhost:11434/api/tags` and
+  refused the connection. A real-model run still requires Ollama, a configured
+  model, real flows, and fitted artifacts.
+
+### Open issues / runtime constraints
+
+- Current Tree SHAP support is limited to binary Random Forest/XGBoost. The
+  artifact loader leaves the explainer unavailable for multiclass or MLP models;
+  escalations then become explicit human-review fallbacks. Extend SHAP support
+  or choose a supported model/task before claiming end-to-end Tier-2 coverage.
+- The static lookup is keyed by unified multiclass labels. A binary `Attack`
+  prediction alone does not identify an attack class, so it receives no static
+  technique tag rather than a guessed one.
+- Run the deferred acceptance checks after real data/model artifacts and Ollama
+  are available; verify all emitted JSONL records against `OutputRecord` and
+  inspect the generated `reports/run_stats.json`.
+
+---
+
+## Report-claim experiment suite E1–E7 (2026-10-19) — BLOCKED
+
+### Availability check
+
+- Read the project rules and current progress before checking artifacts.
+- `data/raw/` contains only `.gitkeep`; `data/processed/` also contains only
+  `.gitkeep`. No CICIDS2017/CICIoT2023 CSVs, processed test split, or zero-day
+  holdout are available.
+- No benchmark, calibration or gate JSON report is present in `reports/`; there
+  are no Tier-1 model/preprocessor/calibrator artifacts under `models/tier1/`.
+  The ATT&CK FAISS index exists, but `data/kb/cve_curated.csv` contains only
+  example placeholders.
+- Local Ollama at `http://localhost:11434/api/tags` is unavailable. The existing
+  ATT&CK mapping and its 60 retrieval queries are marked for human review and
+  cannot serve as validated mapping ground truth.
+- Cost assumptions (GPU-hour price or per-token prices) are not configured.
+
+### Decision
+
+- E1–E7 empirical results are **not measured**. `reports/results.md` records the
+  blocked status for each experiment. No experiment Make targets, metrics JSON,
+  confidence intervals, Pareto figure, random-control results, ablation results,
+  zero-day results, mapping accuracy or rater cases were generated from absent
+  data. The existing provisional retrieval evaluation is not substituted for
+  these experiments.
+- E3's equal-cost random-escalation control is essential to the central claim;
+  without it, confidence gating is **not established to beat random escalation**.
+- To unblock: download CICIDS2017 MachineLearningCVE CSVs into
+  `data/raw/cicids2017/` (official UNB source and eight-file instructions are in
+  the earlier Phase 1–4 blocked entry above), run the real load/preprocess/
+  benchmark/calibrate/gate pipeline, start Ollama, review `attack_lookup.yaml`,
+  and configure cost assumptions. Then generate and execute E1–E7 against the
+  held-out data and obey `eval.sample_cap` for LLM calls.
+- Per the user's instruction to run the project after the phases are complete,
+  the 10,000-flow mock and 200-flow real-model runs also remain deferred.

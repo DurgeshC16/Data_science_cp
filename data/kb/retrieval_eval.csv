@@ -1,0 +1,61 @@
+query,expected_technique_ids,source_label,needs_review
+"TCP flow, high packets per second, short burst, sudden traffic volume increase",T1498,DoS,true
+"UDP traffic, unusually many packets, large outbound volume",T1498,DoS,true
+"flow with sustained bandwidth use and a sharp increase in bytes per second",T1498,DoS,true
+"many short network flows targeting a service, elevated packet rate",T1498,DoS,true
+"large volume of packets toward one destination, low duration per flow",T1498,DoS,true
+"high byte rate and repeated traffic bursts against a remote service",T1498,DoS,true
+"network flow with high packet count and unusually high throughput",T1498,DoS,true
+"short burst of TCP connections with high packets per second",T1498,DoS,true
+"traffic volume spike across flows, elevated bytes per second",T1498,DoS,true
+"many incoming packets in a brief interval, possible service disruption",T1498,DoS,true
+"high-rate flow pattern with repeated packets toward the same service",T1498,DoS,true
+"large flow byte totals and unusually short connection durations",T1498,DoS,true
+"multiple sources sending high-volume traffic to a network service",T1498,DoS,true
+"TCP and UDP flows with extreme packet rates and sustained bandwidth",T1498,DoS,true
+"high throughput network activity that may affect service availability",T1498,DoS,true
+"many sources, high packet rate, repeated traffic bursts toward one target",T1498,DDoS,true
+"distributed flow pattern with high bytes per second at a destination",T1498,DDoS,true
+"large traffic volume from multiple addresses, short repeated connections",T1498,DDoS,true
+"several sources produce a high packet count against a remote service",T1498,DDoS,true
+"high-rate inbound flows with sustained bandwidth consumption",T1498,DDoS,true
+"repeated network bursts from numerous hosts toward one destination",T1498,DDoS,true
+"unusually high aggregate packets per second across source addresses",T1498,DDoS,true
+"traffic flood pattern with large byte totals and repeated flow records",T1498,DDoS,true
+"multiple network sources, elevated flow rate, service availability risk",T1498,DDoS,true
+"short high-volume flows converging on a single network service",T1498,DDoS,true
+"distributed UDP burst with high packet rate and destination concentration",T1498,DDoS,true
+"many TCP flows from different sources with unusually high byte rate",T1498,DDoS,true
+"large inbound traffic spike spread across multiple source hosts",T1498,DDoS,true
+"repeated short flows, high packet counts, numerous source addresses",T1498,DDoS,true
+"high bandwidth use by simultaneous flows targeting the same endpoint",T1498,DDoS,true
+"TCP connections probe many destination ports on one host",T1046,PortScan/Recon,true
+"short flows to sequential ports, repeated connection attempts",T1046,PortScan/Recon,true
+"many destination ports contacted with low bytes per flow",T1046,PortScan/Recon,true
+"rapid connections across a broad port range on a remote system",T1046,PortScan/Recon,true
+"repeated SYN attempts to different service ports, brief connections",T1046,PortScan/Recon,true
+"flow records show numerous destination ports and short durations",T1046,PortScan/Recon,true
+"TCP probing across multiple ports, small packets and failed handshakes",T1046,PortScan/Recon,true
+"network activity touches many ports on the same destination address",T1046,PortScan/Recon,true
+"high count of distinct destination ports, low data transferred",T1046,PortScan/Recon,true
+"brief connections to multiple ports, sequential destination probing",T1046,PortScan/Recon,true
+"port sweep pattern with repeated low-volume TCP flows",T1046,PortScan/Recon,true
+"many ports contacted in a short window, similar packet sizes",T1046,PortScan/Recon,true
+"destination port diversity is high across repeated short network flows",T1046,PortScan/Recon,true
+"repeated service probes across destination ports with little payload",T1046,PortScan/Recon,true
+"TCP flow set explores remote services through many connection attempts",T1046,PortScan/Recon,true
+"many repeated authentication attempts to one service, short connections",T1110,BruteForce,true
+"SSH flows with repeated small exchanges and high connection count",T1110,BruteForce,true
+"repeated login-like requests to a remote service over a short interval",T1110,BruteForce,true
+"many connections to one authentication port, low bytes per attempt",T1110,BruteForce,true
+"repeated failed-authentication pattern represented by frequent short flows",T1110,BruteForce,true
+"high count of similar TCP sessions to SSH with brief duration",T1110,BruteForce,true
+"web service receives repeated credential-check requests in short bursts",T1110,BruteForce,true
+"many small request-response flows to an authentication endpoint",T1110,BruteForce,true
+"repeated access attempts from one source toward a login service",T1110,BruteForce,true
+"short repeated flows to a remote login port with consistent packet sizes",T1110,BruteForce,true
+"high connection count and low payload size per authentication attempt",T1110,BruteForce,true
+"frequent SSH connections with repeated compact packet exchanges",T1110,BruteForce,true
+"repeated web login traffic with similar duration and byte counts",T1110,BruteForce,true
+"bursts of short connections to a service that checks credentials",T1110,BruteForce,true
+"numerous low-volume sessions targeting a remote authentication service",T1110,BruteForce,true

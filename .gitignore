@@ -15,6 +15,9 @@ data/processed/*
 !data/processed/.gitkeep
 data/kb/*
 !data/kb/.gitkeep
+!data/kb/attack_source.json
+!data/kb/cve_curated.csv
+!data/kb/retrieval_eval.csv
 models/*
 !models/.gitkeep
 reports/figures/*

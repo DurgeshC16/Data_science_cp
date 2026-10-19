@@ -285,6 +285,11 @@ class ShapConfig(BaseModel):
 
     background_samples: int = Field(default=200, gt=0)
     max_display_features: int = Field(default=10, gt=0)
+    top_k_features: int = Field(default=3, gt=0)
+    benchmark_calls: int = Field(default=100, gt=0)
+    benchmark_warmup_calls: int = Field(default=10, ge=0)
+    feature_dictionary_path: Path = Path("configs/feature_dictionary.yaml")
+    attack_lookup_path: Path = Path("configs/attack_lookup.yaml")
 
 
 class RagConfig(BaseModel):
@@ -293,10 +298,23 @@ class RagConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    index_path: Path = Path("data/kb/faiss.index")
-    passages_path: Path = Path("data/kb/passages.jsonl")
+    index_path: Path = Path("models/kb_index/faiss.index")
+    passages_path: Path = Path("models/kb_index/documents.jsonl")
     top_k: int = Field(default=5, gt=0)
     min_score: float = 0.0
+    chunk_tokens: int = Field(default=300, gt=0)
+    overlap_tokens: int = Field(default=50, ge=0)
+    embedding_batch_size: int = Field(default=64, gt=0)
+    hybrid_alpha: float = Field(default=0.5, ge=0.0, le=1.0)
+    cve_path: Path = Path("data/kb/cve_curated.csv")
+    retrieval_eval_path: Path = Path("data/kb/retrieval_eval.csv")
+    retrieval_report_path: Path = Path("reports/retrieval_eval.json")
+
+    @model_validator(mode="after")
+    def _valid_chunks(self) -> "RagConfig":
+        if self.overlap_tokens >= self.chunk_tokens:
+            raise ValueError("rag.overlap_tokens must be less than rag.chunk_tokens")
+        return self
 
 
 class LlmConfig(BaseModel):
@@ -311,7 +329,8 @@ class LlmConfig(BaseModel):
     max_tokens: int = Field(default=512, gt=0)
     timeout_seconds: int = Field(default=120, gt=0)
     require_grounded_ids: bool = True
-    max_retries: int = Field(default=1, ge=0)
+    max_retries: int = Field(default=2, ge=0, le=2)
+    cache_path: Path = Path("models/tier2_cache.json")
 
 
 class EvalConfig(BaseModel):
@@ -325,6 +344,16 @@ class EvalConfig(BaseModel):
     bootstrap_resamples: int = Field(default=1000, ge=0)
     confidence_level: float = Field(default=0.95, gt=0.0, lt=1.0)
     metrics: list[str] = Field(default_factory=list)
+
+
+class PipelineConfig(BaseModel):
+    """Batch and concurrency settings for end-to-end cascade inference."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    batch_size: int = Field(default=256, gt=0)
+    tier2_concurrency: int = Field(default=4, gt=0)
+    run_stats_path: Path = Path("reports/run_stats.json")
 
 
 class Config(BaseModel):
@@ -343,6 +372,7 @@ class Config(BaseModel):
     shap: ShapConfig = Field(default_factory=ShapConfig)
     rag: RagConfig = Field(default_factory=RagConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
+    pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     eval: EvalConfig = Field(default_factory=EvalConfig)
 
     def resolved_paths(self, root: Path = PROJECT_ROOT) -> dict[str, Path]:

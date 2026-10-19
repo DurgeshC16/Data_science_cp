@@ -15,7 +15,7 @@ endif
 
 CONFIG ?= configs/config.yaml
 
-.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023 tier1-benchmark calibrate-cicids2017 calibrate-ciciot2023 gate-cicids2017 gate-ciciot2023
+.PHONY: setup venv install dirs test lint clean load-cicids2017 load-ciciot2023 eda-cicids2017 eda-ciciot2023 preprocess-cicids2017 preprocess-ciciot2023 tier1-benchmark calibrate-cicids2017 calibrate-ciciot2023 gate-cicids2017 gate-ciciot2023 kb-build kb-eval run-cascade demo
 
 setup: venv install dirs
 	@$(VENV_PY) -c "from src.config import load_config; c = load_config('$(CONFIG)'); print('config OK:', c.project_name, '| seed', c.seed, '| splits', c.split.train, c.split.val, c.split.test)"
@@ -84,6 +84,23 @@ gate-cicids2017:
 
 gate-ciciot2023:
 	@$(VENV_PY) -m src.gate.gate --dataset ciciot2023 --config $(CONFIG)
+
+# Build the locally sourced ATT&CK/CVE corpus, FAISS index, and retrieval report.
+kb-build:
+	@$(VENV_PY) -m src.rag.build_kb --config $(CONFIG)
+
+kb-eval:
+	@$(VENV_PY) -m src.rag.retriever --config $(CONFIG)
+
+INPUT ?= flows.csv
+OUT ?= out.jsonl
+GATE_PROFILE ?= p10
+
+run-cascade:
+	@$(VENV_PY) -m src.cli run --config $(CONFIG) --input $(INPUT) --gate-profile $(GATE_PROFILE) --out $(OUT) $(if $(DATASET),--dataset $(DATASET),)
+
+demo:
+	@$(VENV_PY) -m streamlit run app/demo.py --server.headless true
 
 clean:
 	@rm -rf $(VENV) .pytest_cache .ruff_cache
